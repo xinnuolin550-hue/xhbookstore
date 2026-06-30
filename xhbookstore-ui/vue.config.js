@@ -9,7 +9,11 @@ const CompressionPlugin = require('compression-webpack-plugin')
 
 const name = process.env.VUE_APP_TITLE || '书城管理系统' // 网页标题
 
-const baseUrl = 'http://localhost:8090' // 后端接口
+// 后端接口地址：从环境变量读取，区分开发/测试/生产
+// .env.development    -> http://localhost:8090 (本地后端)
+// .env.staging        -> http://test-api.xhbookstore.com
+// .env.production     -> http://api.xhbookstore.com
+const baseUrl = process.env.VUE_APP_BASE_URL || 'http://localhost:8090'
 
 const port = process.env.port || process.env.npm_config_port || 80 // 端口
 

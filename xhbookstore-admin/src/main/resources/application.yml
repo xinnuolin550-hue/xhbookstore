@@ -1,6 +1,10 @@
-# ========== admin 模块独有配置 ==========
+# ========== admin 模块通用配置 ==========
+# 环境切换: 通过 --spring.profiles.active=dev|staging|prod 指定
+# 默认使用 dev（本地开发）配置
 
 spring:
+  profiles:
+    active: dev
   config:
     import: classpath:application-base.yml
   messages:

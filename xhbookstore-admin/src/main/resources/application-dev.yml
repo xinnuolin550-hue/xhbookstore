@@ -1,0 +1,61 @@
+# ============================================================
+# Admin 模块 — 本地开发环境配置 (dev)
+# 运行方式: java -jar xhbookstore-admin.jar --spring.profiles.active=dev
+#           mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# ============================================================
+
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://152.136.127.168:3306/xhbookstore?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+        username: root
+        password: root
+      initialSize: 5
+      minIdle: 5
+      maxActive: 20
+      webStatFilter:
+        enabled: true
+      statViewServlet:
+        enabled: true
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: admin
+  data:
+    redis:
+      host: 152.136.127.168
+      port: 6379
+      password:
+      database: 0
+  devtools:
+    restart:
+      enabled: true
+
+# 项目信息
+xhbookstore:
+  name: XhBookstore
+  version: 3.9.2
+  copyrightYear: 2026
+  profile: D:/xhbookstore/uploadPath
+  addressEnabled: false
+  captchaType: math
+
+# Springdoc（开发环境启用）
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  group-configs:
+    - group: 'default'
+      display-name: '测试模块'
+      paths-to-match: '/**'
+      packages-to-scan: com.xhbookstore.web.controller.tool
+
+logging:
+  level:
+    com.xhbookstore: debug
+    org.springframework: info

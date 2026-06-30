@@ -1,0 +1,62 @@
+# ============================================================
+# API 模块 — 本地开发环境配置 (dev)
+# 运行方式: java -jar xhbookstore-api.jar --spring.profiles.active=dev
+#           mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# ============================================================
+
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://152.136.127.168:3306/xhbookstore?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+        username: root
+        password: root
+      initialSize: 5
+      minIdle: 5
+      maxActive: 20
+      statViewServlet:
+        enabled: true
+        url-pattern: /druid/*
+        login-username: admin
+        login-password: admin
+  data:
+    redis:
+      host: 152.136.127.168
+      port: 6379
+      password:
+      database: 0
+
+# 安全配置
+security:
+  jwt:
+    secret: xhbookstore-jwt-secret-key-dev-2026
+    access-token-expire: 7200
+    refresh-token-expire: 2592000
+  rate-limit:
+    login-per-minute: 100
+    write-per-minute: 100
+    points-per-minute: 100
+
+# 微信小程序（开发环境）
+wechat:
+  app-id: wx-dev-app-id
+  app-secret: dev-app-secret-here
+  token-cache-key: wechat:access_token
+  token-expire-seconds: 7200
+  token-refresh-ahead: 300
+
+# 腾讯云COS（开发环境）
+cos:
+  secret-id: dev-secret-id
+  secret-key: dev-secret-key
+  region: ap-guangzhou
+  bucket: xhbookstore-dev-1250000000
+  base-url: https://xhbookstore-dev-1250000000.cos.ap-guangzhou.myqcloud.com
+  max-file-size: 10485760
+
+logging:
+  level:
+    com.xhbookstore.api: debug
+    com.xhbookstore: debug
+    org.springframework: info
+    org.mybatis: debug

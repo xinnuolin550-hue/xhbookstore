@@ -1,0 +1,70 @@
+# ============================================================
+# API 模块 — 生产环境配置 (prod)
+# 运行方式: java -jar xhbookstore-api.jar --spring.profiles.active=prod
+#           mvn spring-boot:run -Dspring-boot.run.profiles=prod
+# ============================================================
+
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://localhost:3306/xhbookstore?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+        username: xhbookstore_prod
+        password: prod-db-password
+      initialSize: 20
+      minIdle: 20
+      maxActive: 200
+      maxWait: 60000
+      statViewServlet:
+        enabled: false
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true
+          slow-sql-millis: 1000
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: xhbookstore_prod_redis
+      database: 0
+      timeout: 10s
+      lettuce:
+        pool:
+          min-idle: 10
+          max-idle: 50
+          max-active: 100
+
+# 安全配置（生产环境使用强密码）
+security:
+  jwt:
+    secret: ${JWT_SECRET:xj9K#mP2$vL7nQ4@wR8tY1^bF5dH3sA6}
+    access-token-expire: 3600
+    refresh-token-expire: 604800
+  rate-limit:
+    login-per-minute: 5
+    write-per-minute: 30
+    points-per-minute: 10
+
+# 微信小程序（生产环境）
+wechat:
+  app-id: ${WECHAT_APP_ID:wx-prod-app-id}
+  app-secret: ${WECHAT_APP_SECRET:prod-app-secret}
+  token-cache-key: wechat:access_token
+  token-expire-seconds: 7200
+  token-refresh-ahead: 300
+
+# 腾讯云COS（生产环境）
+cos:
+  secret-id: ${COS_SECRET_ID:prod-secret-id}
+  secret-key: ${COS_SECRET_KEY:prod-secret-key}
+  region: ap-guangzhou
+  bucket: xhbookstore-prod-1250000000
+  base-url: https://xhbookstore-prod-1250000000.cos.ap-guangzhou.myqcloud.com
+  max-file-size: 10485760
+
+logging:
+  level:
+    com.xhbookstore.api: warn
+    com.xhbookstore: warn
+    org.springframework: error

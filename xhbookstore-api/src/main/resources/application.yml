@@ -1,16 +1,27 @@
-# ========== api 模块独有配置 ==========
+# ========== api 模块通用配置 ==========
+# 环境切换: 通过 --spring.profiles.active=dev|staging|prod 指定
+# 默认使用 dev（本地开发）配置
 
 spring:
+  profiles:
+    active: dev
   config:
     import: classpath:application-base.yml
   main:
     allow-bean-definition-overriding: true
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  datasource:
+    druid:
+      connectionInitSqls:
+        - SET NAMES utf8mb4
 
 server:
   port: 8091
   servlet:
     context-path: /
-
-logging:
-  level:
-    com.xhbookstore.api: debug
+  tomcat:
+    uri-encoding: UTF-8

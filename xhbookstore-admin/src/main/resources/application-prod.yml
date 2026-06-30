@@ -1,0 +1,57 @@
+# ============================================================
+# Admin 模块 — 生产环境配置 (prod)
+# 运行方式: java -jar xhbookstore-admin.jar --spring.profiles.active=prod
+#           mvn spring-boot:run -Dspring-boot.run.profiles=prod
+# ============================================================
+
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://localhost:3306/xhbookstore?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+        username: xhbookstore_prod
+        password: prod-db-password
+      initialSize: 20
+      minIdle: 20
+      maxActive: 200
+      maxWait: 60000
+      webStatFilter:
+        enabled: false
+      statViewServlet:
+        enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: xhbookstore_prod_redis
+      database: 0
+      timeout: 10s
+      lettuce:
+        pool:
+          min-idle: 10
+          max-idle: 50
+          max-active: 100
+  devtools:
+    restart:
+      enabled: false
+
+# 项目信息
+xhbookstore:
+  name: XhBookstore
+  version: 3.9.2
+  copyrightYear: 2026
+  profile: /data/xhbookstore/uploadPath
+  addressEnabled: false
+  captchaType: math
+
+# Springdoc（生产环境禁用）
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.xhbookstore: warn
+    org.springframework: error

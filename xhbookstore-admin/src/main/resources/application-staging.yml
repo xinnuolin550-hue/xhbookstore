@@ -1,0 +1,58 @@
+# ============================================================
+# Admin 模块 — 测试环境配置 (staging)
+# 运行方式: java -jar xhbookstore-admin.jar --spring.profiles.active=staging
+#           mvn spring-boot:run -Dspring-boot.run.profiles=staging
+# ============================================================
+
+spring:
+  datasource:
+    druid:
+      master:
+        url: jdbc:mysql://localhost:3306/xhbookstore?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&characterSetResults=utf8mb4&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+        username: xhbookstore_test
+        password: test-db-password
+      initialSize: 10
+      minIdle: 10
+      maxActive: 50
+      webStatFilter:
+        enabled: false
+      statViewServlet:
+        enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: xhbookstore_test_redis
+      database: 0
+  devtools:
+    restart:
+      enabled: false
+
+# 项目信息
+xhbookstore:
+  name: XhBookstore
+  version: 3.9.2
+  copyrightYear: 2026
+  profile: /data/xhbookstore/uploadPath
+  addressEnabled: false
+  captchaType: math
+
+# Springdoc（测试环境启用）
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  group-configs:
+    - group: 'default'
+      display-name: '测试模块'
+      paths-to-match: '/**'
+      packages-to-scan: com.xhbookstore.web.controller.tool
+
+logging:
+  level:
+    com.xhbookstore: info
+    org.springframework: warn
