@@ -43,5 +43,12 @@ logs/
 tmp/
 temp/
 
+# Claude Code local settings
+.claude/settings.local.json
+
+# Doc images
+doc/*.jpg
+doc/*.png
+
 # Upload
 uploadPath/
