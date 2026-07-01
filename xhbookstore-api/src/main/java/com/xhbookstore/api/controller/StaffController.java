@@ -12,6 +12,7 @@ import com.xhbookstore.api.model.PageResult;
 import com.xhbookstore.system.domain.member.Member;
 import com.xhbookstore.system.domain.member.PointsOrder;
 import com.xhbookstore.system.domain.book.*;
+import com.xhbookstore.system.mapper.member.MemberMapper;
 import com.xhbookstore.system.service.member.IMemberService;
 import com.xhbookstore.system.service.member.IPointsService;
 import com.xhbookstore.system.service.book.IBookBorrowService;
@@ -25,6 +26,8 @@ public class StaffController {
 
     @Autowired
     private IMemberService memberService;
+    @Autowired
+    private MemberMapper memberMapper;
     @Autowired
     private IPointsService pointsService;
     @Autowired
@@ -43,7 +46,7 @@ public class StaffController {
     }
 
     /**
-     * 解析会员码 §12.2
+     * 解析会员码 §12.2 — 格式: MEMBER:{cardNo}:TIMESTAMP:{ts}
      */
     @PostMapping("/member-code/scan")
     public ApiResponse<Map<String, Object>> scanMemberCode(@RequestBody Map<String, String> body) {
@@ -52,11 +55,35 @@ public class StaffController {
             throw new ApiException(ApiErrorCode.PARAM_INVALID, "缺少扫码内容");
         }
 
-        // TODO: 解析会员码并验证有效期
-        String memberId = "1"; // Mock
+        // 解析格式: MEMBER:65000000001:TIMESTAMP:1782921744290
+        String[] parts = scanResult.split(":");
+        if (parts.length < 4 || !"MEMBER".equals(parts[0]) || !"TIMESTAMP".equals(parts[2])) {
+            throw new ApiException(ApiErrorCode.PARAM_INVALID, "无效的会员码格式");
+        }
+
+        String memberNo = parts[1];
+        long codeTimestamp;
+        try {
+            codeTimestamp = Long.parseLong(parts[3]);
+        } catch (NumberFormatException e) {
+            throw new ApiException(ApiErrorCode.PARAM_INVALID, "会员码时间戳无效");
+        }
+
+        // 验证有效期（30秒）
+        long now = System.currentTimeMillis();
+        if (now - codeTimestamp > 30_000) {
+            throw new ApiException(ApiErrorCode.PARAM_INVALID, "会员码已过期，请刷新");
+        }
+
+        // 根据卡号查会员
+        Member member = memberMapper.selectMemberByCardNo(memberNo);
+        if (member == null) {
+            throw new ApiException(ApiErrorCode.MEMBER_NOT_FOUND);
+        }
 
         Map<String, Object> data = new HashMap<>();
-        data.put("memberId", memberId);
+        data.put("memberId", String.valueOf(member.getId()));
+        data.put("memberNo", member.getCardNo());
         return ApiResponse.success(data);
     }
 

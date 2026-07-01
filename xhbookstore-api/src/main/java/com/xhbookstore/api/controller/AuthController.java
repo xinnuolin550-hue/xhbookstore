@@ -17,8 +17,10 @@ import com.xhbookstore.api.service.IWechatService;
 import com.xhbookstore.common.utils.StringUtils;
 import com.xhbookstore.common.core.domain.entity.SysUser;
 import com.xhbookstore.system.domain.member.Member;
+import com.xhbookstore.system.domain.member.MemberExt;
 import com.xhbookstore.system.mapper.SysUserMapper;
 import com.xhbookstore.system.mapper.member.MemberMapper;
+import com.xhbookstore.system.service.member.IMemberService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -40,6 +42,7 @@ public class AuthController {
     @Autowired private IWechatService wechatService;
     @Autowired private MemberMapper memberMapper;
     @Autowired private SysUserMapper sysUserMapper;
+    @Autowired private IMemberService memberService;
     @Autowired private SecurityProperties securityProperties;
 
     /** 微信手机号登录 — 查询member和sys_user两张表，返回双Token */
@@ -64,6 +67,32 @@ public class AuthController {
         if (member != null && member.getStatus() != null && member.getStatus() != 0) {
             log.warn("[登录拒绝] phone={}, memberId={}, status={} (非正常状态)", maskPhone(phone), member.getId(), member.getStatus());
             member = null;
+        }
+
+        // 新用户自动注册：手机号不在member表中，自动创建会员记录
+        if (member == null && staff == null) {
+            try {
+                member = new Member();
+                member.setPhone(phone);
+                member.setName("");                           // 姓名后续补充
+                member.setStatus(0);                          // 正常
+                member.setSource("wechat");                   // 来源：微信小程序
+                member.setCurrentPoints(0);
+                member.setBorrowCountValid(0);
+                member.setSyncErp(0);
+                member.setLastOperator("system");
+                // 生成卡号：微信用户用 "9" + 时间戳后10位 生成11位唯一卡号
+                String cardNo = "9" + String.format("%010d", System.currentTimeMillis() % 10_000_000_000L);
+                member.setCardNo(cardNo);
+                // 直接写入 member 表（不用 insertMember service，避免调用 SecurityUtils 报错）
+                memberMapper.insertMember(member);
+                // 重新查出完整数据
+                member = memberMapper.selectMemberByPhone(phone);
+                log.info("[自动注册] phone={}, cardNo={}, memberId={}", maskPhone(phone), cardNo, member != null ? member.getId() : null);
+            } catch (Exception e) {
+                log.error("[自动注册失败] phone={}, error={}", maskPhone(phone), e.getMessage());
+                member = null;  // 注册失败不阻塞登录
+            }
         }
 
         boolean isMember = member != null;

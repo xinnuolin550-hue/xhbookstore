@@ -37,7 +37,10 @@
     <select id="selectMemberList" parameterType="com.xhbookstore.system.domain.member.Member" resultMap="MemberResult">
         <include refid="selectMemberVo"/>
         <where>
-            <if test="status != null">and m.status = #{status}</if>
+            <choose>
+                <when test="status != null">and m.status = #{status}</when>
+                <otherwise>and m.status != 1</otherwise>
+            </choose>
             <if test="name != null and name != ''">and m.name like concat('%', #{name}, '%')</if>
             <if test="phone != null and phone != ''">and m.phone like concat('%', #{phone}, '%')</if>
             <if test="deptId != null and deptId != 0">and m.dept_id = #{deptId}</if>
@@ -54,7 +57,10 @@
     <select id="selectMemberListForExport" parameterType="com.xhbookstore.system.domain.member.Member" resultMap="MemberResult">
         <include refid="selectMemberVo"/>
         <where>
-            <if test="status != null">and m.status = #{status}</if>
+            <choose>
+                <when test="status != null">and m.status = #{status}</when>
+                <otherwise>and m.status != 1</otherwise>
+            </choose>
             <if test="name != null and name != ''">and m.name like concat('%', #{name}, '%')</if>
             <if test="phone != null and phone != ''">and m.phone like concat('%', #{phone}, '%')</if>
             <if test="deptId != null and deptId != 0">and m.dept_id = #{deptId}</if>

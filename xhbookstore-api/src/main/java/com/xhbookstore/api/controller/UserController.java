@@ -28,36 +28,85 @@ public class UserController {
     private IBookBorrowService bookBorrowService;
 
     /**
-     * 查询用户首页 §11.1
+     * 查询用户首页 §11.1 — 从Token获取手机号，查会员真实数据
      */
     @GetMapping("/home")
     public ApiResponse<Map<String, Object>> home(HttpServletRequest request) {
+        // 从JWT Token中获取手机号
+        String phone = (String) request.getAttribute("phone");
+        if (phone == null) phone = "";
+        String phoneDisplay = phone.length() >= 7
+                ? phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4)
+                : phone;
+
+        // 从JWT Token中获取memberId，查真实会员数据
+        Object memberIdObj = request.getAttribute("memberId");
+        Integer memberId = memberIdObj != null ? Integer.valueOf(memberIdObj.toString()) : null;
+
         Map<String, Object> data = new HashMap<>();
-        data.put("phoneDisplay", "138****0001");
-        // 构建会员概要
-        Map<String, Object> member = new HashMap<>();
-        member.put("memberId", null);
-        member.put("memberNo", "");
-        member.put("memberName", "");
-        member.put("phoneDisplay", "138****0001");
-        member.put("card", null);
-        member.put("currentPoints", 0);
-        member.put("currentBorrowingCount", 0);
-        member.put("yearBorrowCount", 0);
-        data.put("member", member);
+        data.put("phoneDisplay", phoneDisplay);
+
+        Map<String, Object> memberMap = new HashMap<>();
+        if (memberId != null) {
+            Member member = memberService.selectMemberById(memberId);
+            if (member != null) {
+                // 会员卡信息
+                Map<String, Object> card = new HashMap<>();
+                card.put("memberNo", member.getCardNo());
+                card.put("cardName", member.getCardTypeName());
+                card.put("cardStatus", member.getStatus() != null && member.getStatus() == 0 ? "active" : "inactive");
+                card.put("level", member.getLevelId());
+                card.put("remainingDays", member.getValidDate() != null
+                        ? Math.max(0, (member.getValidDate().getTime() - System.currentTimeMillis()) / 86400000L)
+                        : 0);
+
+                memberMap.put("memberId", member.getId());
+                memberMap.put("memberNo", member.getCardNo());
+                memberMap.put("memberName", member.getName());
+                memberMap.put("phoneDisplay", phoneDisplay);
+                memberMap.put("card", card);
+                memberMap.put("currentPoints", member.getCurrentPoints() != null ? member.getCurrentPoints() : 0);
+                memberMap.put("currentBorrowingCount", 0); // TODO: 真实统计
+                memberMap.put("yearBorrowCount", 0);        // TODO: 真实统计
+            }
+        } else {
+            memberMap.put("memberId", null);
+            memberMap.put("memberNo", "");
+            memberMap.put("memberName", "");
+            memberMap.put("phoneDisplay", phoneDisplay);
+            memberMap.put("card", null);
+            memberMap.put("currentPoints", 0);
+            memberMap.put("currentBorrowingCount", 0);
+            memberMap.put("yearBorrowCount", 0);
+        }
+        data.put("member", memberMap);
         return ApiResponse.success(data);
     }
 
     /**
-     * 生成动态会员码 §11.2
+     * 生成动态会员码 §11.2 — 根据当前登录会员生成真实二维码内容
      */
     @PostMapping("/member-code")
-    public ApiResponse<Map<String, Object>> generateMemberCode() {
-        // TODO: 根据当前用户生成动态二维码
+    public ApiResponse<Map<String, Object>> generateMemberCode(HttpServletRequest request) {
+        // 从Token获取memberId
+        Object memberIdObj = request.getAttribute("memberId");
+        if (memberIdObj == null) {
+            throw new com.xhbookstore.api.exception.ApiException(
+                    com.xhbookstore.api.constant.ApiErrorCode.MEMBER_NOT_FOUND,
+                    "仅会员可生成会员码");
+        }
+        Integer memberId = Integer.valueOf(memberIdObj.toString());
+        Member member = memberService.selectMemberById(memberId);
+        if (member == null || member.getCardNo() == null) {
+            throw new com.xhbookstore.api.exception.ApiException(
+                    com.xhbookstore.api.constant.ApiErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        String memberNo = member.getCardNo();
         Map<String, Object> data = new HashMap<>();
-        data.put("memberNo", "65000000001");
+        data.put("memberNo", memberNo);
         data.put("codeId", UUID.randomUUID().toString());
-        data.put("codeContent", "MEMBER:65000000001:TIMESTAMP:" + System.currentTimeMillis());
+        data.put("codeContent", "MEMBER:" + memberNo + ":TIMESTAMP:" + System.currentTimeMillis());
         data.put("expiresAt", System.currentTimeMillis() + 30000);
         data.put("ttlSeconds", 30);
         return ApiResponse.success(data);
@@ -86,8 +135,9 @@ public class UserController {
             records.add(r);
         }
 
+        String phone = (String) request.getAttribute("phone");
         Map<String, Object> data = new HashMap<>();
-        data.put("memberDisplay", "138****0001");
+        data.put("memberDisplay", maskPhone(phone));
         data.put("yearBorrowCount", orders.size());
         data.put("currentBorrowingCount", orders.stream().filter(o -> o.getBorrowStatus() != null && o.getBorrowStatus() != 2 && o.getBorrowStatus() != 5).count());
         data.put("page", new PageResult<>(records, pageNo, pageSize, records.size()));
@@ -116,7 +166,8 @@ public class UserController {
     @GetMapping("/points-records")
     public ApiResponse<Map<String, Object>> myPointsRecords(
             @RequestParam(defaultValue = "1") int pageNo,
-            @RequestParam(defaultValue = "20") int pageSize) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            HttpServletRequest request) {
         // TODO: 关联当前用户memberId
         List<PointsOrder> orders = pointsService.selectByMemberId(1);
         List<Map<String, Object>> records = new ArrayList<>();
@@ -131,8 +182,9 @@ public class UserController {
             r.put("operatedAt", o.getCreatedAt().getTime());
             records.add(r);
         }
+        String phone2 = (String) request.getAttribute("phone");
         Map<String, Object> data = new HashMap<>();
-        data.put("memberDisplay", "138****0001");
+        data.put("memberDisplay", maskPhone(phone2));
         data.put("currentPoints", 100);
         data.put("yearEarnedPoints", 50);
         data.put("page", new PageResult<>(records, pageNo, pageSize, records.size()));
@@ -147,5 +199,10 @@ public class UserController {
         Map<String, Object> data = new HashMap<>();
         data.put("pointsRecordId", pointsRecordId);
         return ApiResponse.success(data);
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) return phone != null ? phone : "";
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 }

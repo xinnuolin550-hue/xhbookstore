@@ -37,6 +37,10 @@ public class WechatServiceImpl implements IWechatService {
     @Autowired private RedisCache redisCache;
     @Autowired private RedisTemplate<Object, Object> redisTemplate;
 
+    /** 当前激活的Spring Profile（用于Mock判断） */
+    @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     private static final String WX_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/stable_token";
     private static final String WX_PHONE_URL = "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=";
     private static final String LOCK_KEY_SUFFIX = ":lock";
@@ -166,6 +170,18 @@ public class WechatServiceImpl implements IWechatService {
         }
     }
 
+    /** 生成Mock手机号：纯11位数字直接用，否则hash生成唯一测试号 */
+    private String extractMockPhone(String code) {
+        if (code == null || code.isEmpty()) return "13900000001";
+        // 如果code本身就是11位纯数字，直接当手机号用（方便dev/staging测试）
+        if (code.matches("\\d{11}")) {
+            return code;
+        }
+        // hash code生成唯一手机号（1开头11位），不同用户不同值
+        int hash = Math.abs(code.hashCode());
+        return "1" + String.format("%010d", hash % 10_000_000_000L);
+    }
+
     private String fetchAccessTokenFromWechat() {
         try {
             String body = "{\"grant_type\":\"client_credential\","
@@ -196,7 +212,21 @@ public class WechatServiceImpl implements IWechatService {
 
     @Override
     public String getPhoneNumber(String code) {
+        // dev环境Mock：本地开发无微信凭证
+        if ("dev".equals(activeProfile)) {
+            String mockPhone = extractMockPhone(code);
+            log.info("[微信Mock] dev环境 code={} → phone={}", code, mockPhone);
+            return mockPhone;
+        }
+
+        // staging/prod：只调真实微信API，不兜底
+        return getPhoneNumberFromWechat(code);
+    }
+
+    /** 真实调用微信 getuserphonenumber 接口 */
+    private String getPhoneNumberFromWechat(String code) {
         String accessToken = getAccessToken();
+        if (accessToken == null) return null;
 
         try {
             String url = WX_PHONE_URL + accessToken;
@@ -213,9 +243,9 @@ public class WechatServiceImpl implements IWechatService {
 
             if (json.getIntValue("errcode") == 0) {
                 JSONObject phoneInfo = json.getJSONObject("phone_info");
-                String phone = phoneInfo.getString("purePhoneNumber");
-                log.info("[微信手机号] 获取成功: {}", phone.substring(0, 3) + "****" + phone.substring(7));
-                return phone;
+                String phoneNumber = phoneInfo.getString("purePhoneNumber");
+                log.info("[微信手机号] 获取成功: {}", phoneNumber.substring(0, 3) + "****" + phoneNumber.substring(7));
+                return phoneNumber;
             } else {
                 log.error("[微信手机号] 失败: errcode={} errmsg={}",
                         json.getIntValue("errcode"), json.getString("errmsg"));

@@ -53,15 +53,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 白名单放行
-        if (isWhiteList(uri)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // 提取Token
+        // 提取Token（白名单也尝试解析，但不强制要求）
         String token = extractToken(request);
+        boolean isWhiteListed = isWhiteList(uri);
+
         if (StringUtils.isEmpty(token)) {
+            if (isWhiteListed) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             writeUnauthorized(response, ApiErrorCode.UNAUTHORIZED, "缺少访问令牌");
             return;
         }
@@ -78,11 +78,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             request.setAttribute("isStaff", claims.get("isStaff"));
             request.setAttribute("memberId", claims.get("memberId"));
             request.setAttribute("staffUserId", claims.get("staffUserId"));
+            request.setAttribute("phone", claims.get("phone"));
         } catch (ExpiredJwtException e) {
+            if (isWhiteListed) {
+                log.debug("[Token过期-白名单] uri={}", uri);
+                filterChain.doFilter(request, response);
+                return;
+            }
             log.warn("[Token过期] uri={}", uri);
             writeUnauthorized(response, ApiErrorCode.AUTH_TOKEN_EXPIRED, "登录已过期，请重新登录");
             return;
         } catch (Exception e) {
+            if (isWhiteListed) {
+                log.debug("[Token无效-白名单] uri={}", uri);
+                filterChain.doFilter(request, response);
+                return;
+            }
             log.warn("[Token无效] uri={}, error={}", uri, e.getMessage());
             writeUnauthorized(response, ApiErrorCode.AUTH_TOKEN_INVALID, "无效的访问令牌");
             return;
