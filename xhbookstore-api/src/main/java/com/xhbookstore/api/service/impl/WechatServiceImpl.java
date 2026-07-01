@@ -37,7 +37,7 @@ public class WechatServiceImpl implements IWechatService {
     @Autowired private RedisCache redisCache;
     @Autowired private RedisTemplate<Object, Object> redisTemplate;
 
-    private static final String WX_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
+    private static final String WX_TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/stable_token";
     private static final String WX_PHONE_URL = "https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=";
     private static final String LOCK_KEY_SUFFIX = ":lock";
     private static final long LOCK_TIMEOUT_SEC = 10;      // 锁超时10秒
@@ -48,29 +48,26 @@ public class WechatServiceImpl implements IWechatService {
     public String getAccessToken() {
         String cacheKey = wechatConfig.getTokenCacheKey();
 
-        // 1. 先查Redis缓存，存在直接返回
+        // 查Redis缓存，存在直接返回（stable_token不互相失效，缓存即有效）
         String cached = redisCache.getCacheObject(cacheKey);
         if (cached != null && !cached.isEmpty()) {
             log.debug("[微信Token] 命中Redis缓存");
             return cached;
         }
 
-        // 2. 缓存不存在，尝试获取分布式锁
+        // 缓存不存在，加锁避免并发重复请求（但stable_token不互斥，锁仅用于减少API调用）
         String lockKey = cacheKey + LOCK_KEY_SUFFIX;
         String lockValue = UUID.randomUUID().toString();
         boolean locked = tryLock(lockKey, lockValue, LOCK_TIMEOUT_SEC);
 
         if (locked) {
-            // 抢到锁 — 由本实例调微信API
             try {
-                // Double-check：可能其他实例刚写入
                 String doubleCheck = redisCache.getCacheObject(cacheKey);
                 if (doubleCheck != null && !doubleCheck.isEmpty()) {
-                    log.info("[微信Token] Double-check命中，无需重复获取");
                     return doubleCheck;
                 }
 
-                log.info("[微信Token] 获得分布式锁，调用微信API...");
+                log.info("[微信Token] 调用stable_token接口...");
                 String token = fetchAccessTokenFromWechat();
                 if (token == null) {
                     log.error("[微信Token] 获取失败，请检查微信AppID/AppSecret配置");
@@ -79,27 +76,23 @@ public class WechatServiceImpl implements IWechatService {
 
                 long cacheSeconds = wechatConfig.getTokenExpireSeconds() - wechatConfig.getTokenRefreshAhead();
                 redisCache.setCacheObject(cacheKey, token, (int) cacheSeconds, TimeUnit.SECONDS);
-                log.info("[微信Token] 写入Redis成功，有效期{}秒", cacheSeconds);
+                log.info("[微信Token] 缓存成功，TTL={}秒", cacheSeconds);
                 return token;
             } finally {
                 unlock(lockKey, lockValue);
             }
         } else {
-            // 未抢到锁 — 等待其他实例写入Redis后读取
-            log.info("[微信Token] 未获得锁，等待其他实例写入...");
+            // 未抢到锁，短暂等待后从缓存读取
             long start = System.currentTimeMillis();
             while (System.currentTimeMillis() - start < WAIT_MAX_MS) {
                 try { Thread.sleep(WAIT_INTERVAL_MS); } catch (InterruptedException e) { break; }
                 String waited = redisCache.getCacheObject(cacheKey);
                 if (waited != null && !waited.isEmpty()) {
-                    log.info("[微信Token] 等待{}ms后命中缓存", System.currentTimeMillis() - start);
                     return waited;
                 }
             }
-
-            // 超时了还没等到，可能是获取token的实例失败了，自己再试一次
-            log.warn("[微信Token] 等待超时，尝试再次获取...");
-            return getAccessToken(); // 递归重试
+            log.warn("[微信Token] 等待超时，直接获取...");
+            return fetchAccessTokenFromWechat();
         }
     }
 
@@ -175,16 +168,21 @@ public class WechatServiceImpl implements IWechatService {
 
     private String fetchAccessTokenFromWechat() {
         try {
-            String url = WX_TOKEN_URL + "?grant_type=client_credential"
-                    + "&appid=" + wechatConfig.getAppId()
-                    + "&secret=" + wechatConfig.getAppSecret();
+            String body = "{\"grant_type\":\"client_credential\","
+                    + "\"appid\":\"" + wechatConfig.getAppId() + "\","
+                    + "\"secret\":\"" + wechatConfig.getAppSecret() + "\"}";
 
             HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(WX_TOKEN_URL))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             JSONObject json = JSON.parseObject(response.body());
 
             if (json.containsKey("access_token")) {
+                log.info("[微信Token] stable_token获取成功, expires_in={}", json.getInteger("expires_in"));
                 return json.getString("access_token");
             } else {
                 log.error("[微信Token] 微信返回错误: {}", response.body());
